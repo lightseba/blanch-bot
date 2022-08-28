@@ -4,7 +4,7 @@ git clone https://github.com/lightseba/blanch-bot.git
 cd blanch-bot
 # add the .env file here
 python3 -m pip install --user pipenv
-python3 -m pipenv install -e
+python3 -m pipenv install
 ```
 run with
 ```bash
