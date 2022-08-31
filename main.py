@@ -11,7 +11,7 @@ import hikari
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
-EASTERN_USER_ID = int(os.getenv("EASTERN_USER_ID"))
+MINOR_IDS = tuple(int(user_id) for user_id in os.getenv("EASTERN_USER_ID").split(","))
 ADULT_ROLE_ID = int(os.getenv("ADULT_ROLE_ID"))
 MENTAL_ASYLUM_GUILD_ID = int(os.getenv("MENTAL_ASYLUM_GUILD_ID"))
 BLANCHPOSTING_PERMS = 2  # can kick = can blanchpost
@@ -22,16 +22,14 @@ bot = hikari.GatewayBot(token=TOKEN, intents=INTENTS)
 
 
 @bot.listen()
-async def remove_eastern_adult_role(event: hikari.MemberUpdateEvent) -> None:
+async def remove_minor_adult_role(event: hikari.MemberUpdateEvent) -> None:
     """pls eastern stop adding the adult role"""
 
-    if event.member.id != EASTERN_USER_ID:
+    if event.member.id not in MINOR_IDS:
         return
 
     if ADULT_ROLE_ID in event.member.role_ids:
-        logging.info(
-            f"See eastern ({event.member}) w/ adult role (id={ADULT_ROLE_ID}), removing..."
-        )
+        logging.info(f"See child ({event.member}) w/ adult role, removing...")
         await event.member.remove_role(ADULT_ROLE_ID)
 
 
