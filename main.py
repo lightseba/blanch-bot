@@ -1,23 +1,28 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
 import random
-from typing import Optional
+from typing import Optional, cast
 
 import hikari
 
 from config import (
     ADULT_ROLE_ID,
     BLANCHPOST_MAX_TYPING_TIME,
-    BLANCHPOST_PROBABILITIES,
+    BLANCHPOST_QUOTA,
     INTENTS,
+    LOGS_CHANNEL_ID,
     MENTAL_ASYLUM_GUILD_ID,
     MINOR_IDS,
     TOKEN,
 )
 
 bot = hikari.GatewayBot(token=TOKEN, intents=INTENTS)  # type: ignore
+
+BLANCHPOSTING_WEEK = -1
+BLANCHPOSTING_COUNTS = {}
 
 
 @bot.listen()
@@ -66,6 +71,21 @@ async def register_commands(event: hikari.StartingEvent) -> None:
     )
 
 
+async def _grab_logs_channel() -> Optional[hikari.GuildChannel]:
+    return bot.cache.get_guild_channel(LOGS_CHANNEL_ID) or cast(
+        hikari.GuildChannel, await bot.rest.fetch_channel(LOGS_CHANNEL_ID)
+    )
+
+
+@bot.listen()
+async def init_bot(event: hikari.StartedEvent) -> None:
+    guild = await bot.rest.fetch_guild(MENTAL_ASYLUM_GUILD_ID)
+
+    for role_id, prob in BLANCHPOST_QUOTA.items():
+        role = guild.roles[role_id]  # type: ignore
+        logging.debug(f"{role} -> {prob}")
+
+
 async def get_reply_message(
     reply_option: str,
     channel: hikari.TextableChannel,
@@ -92,16 +112,38 @@ async def get_reply_message(
     return reply_msg
 
 
-async def get_success_probability(member: hikari.Member) -> float:
-    """get the highest probability"""
+def get_blanchpost_quota(member: hikari.Member) -> int:
     return max(
         (
-            prob
-            for role_id, prob in BLANCHPOST_PROBABILITIES.items()
+            quota
+            for role_id, quota in BLANCHPOST_QUOTA.items()
             if role_id in member.role_ids
         ),
         default=0,
     )
+
+
+def check_blanchpost_week() -> None:
+    global BLANCHPOSTING_WEEK, BLANCHPOSTING_COUNTS
+
+    current_week = datetime.datetime.now().isocalendar()[1]
+
+    if BLANCHPOSTING_WEEK != current_week:
+        BLANCHPOSTING_COUNTS = {}
+        BLANCHPOSTING_WEEK = current_week
+
+
+def remaining_blanchpost(member: hikari.Member) -> int:
+    check_blanchpost_week()
+
+    so_far = BLANCHPOSTING_COUNTS.get(member.id, 0)
+    quota = get_blanchpost_quota(member)
+    remaining = quota - so_far
+
+    if remaining:
+        BLANCHPOSTING_COUNTS[member.id] = so_far + 1
+
+    return remaining
 
 
 async def handle_blanchpost(interaction: hikari.CommandInteraction) -> None:
@@ -109,7 +151,7 @@ async def handle_blanchpost(interaction: hikari.CommandInteraction) -> None:
 
     assert interaction.options
 
-    channel = await interaction.fetch_channel()
+    channel = interaction.get_channel() or await interaction.fetch_channel()
     message_content = interaction.options[0].value
     logging.info(
         f"got blanchpost request from {interaction.member} "
