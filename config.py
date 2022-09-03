@@ -1,25 +1,25 @@
 import os
-from typing import Mapping
+from typing import Final, Mapping, Tuple
 
 import hikari
 from dotenv import load_dotenv
 
 load_dotenv()
 
-TOKEN = os.getenv("TOKEN")
-INTENTS = hikari.Intents.GUILD_MEMBERS
+TOKEN: Final[str] = os.getenv("TOKEN") or ""
+INTENTS: Final[hikari.Intents] = hikari.Intents.GUILD_MEMBERS
 
-MENTAL_ASYLUM_GUILD_ID = 1005926922062139463
-LOGS_CHANNEL_ID = 1007811381694824469
+MENTAL_ASYLUM_GUILD_ID: Final[int] = 1005926922062139463
+LOGS_CHANNEL_ID: Final[int] = 1007811381694824469
 
-MINOR_IDS = (963674009986281534,)  # eastern
-ADULT_ROLE_ID = 1007477954693058660
-TRUSTED_ROLE_ID = 1009589091777646643
-TRUSTED_NSFW_ROLE_ID = 1015352468147806359
+MINOR_IDS: Final[Tuple[int]] = (963674009986281534,)  # eastern
+ADULT_ROLE_ID: Final[int] = 1007477954693058660
+TRUSTED_ROLE_ID: Final[int] = 1009589091777646643
+TRUSTED_NSFW_ROLE_ID: Final[int] = 1015352468147806359
 
-BLANCHPOST_COUNTS_FILE = "blanchposting_counts.json"
-BLANCHPOST_MAX_TYPING_TIME = 5
-BLANCHPOSTS_PER_DAY = 3
+BLANCHPOST_COUNTS_FILE: Final[str] = "blanchposting_counts.json"
+BLANCHPOST_MAX_TYPING_TIME: Final[int] = 5
+BLANCHPOSTS_PER_DAY: Final[int] = 3
 BLANCHPOST_QUOTA: Mapping[int, int] = {
     # -1 = infinite blanchposting privledge
     1005930819094851655: 10**9,  # big sister
