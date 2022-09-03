@@ -47,9 +47,12 @@ async def remove_minor_adult_role(member: hikari.Member) -> None:
 async def scold_vika(member: hikari.Member) -> None:
     """kek"""
 
+    logging.info(f"update from {member}")
+
     if member.id != VIKA_ID:
         return
 
+    logging.info("see vika!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     assert member.nickname
 
     is_agp = AGP_ROLE_ID in member.role_ids
@@ -68,7 +71,7 @@ async def scold_vika(member: hikari.Member) -> None:
         new_name = prefix + " (lesbian)"
         await member.edit(nickname=new_name)
 
-    await member.send("You can't fool me, autogenophile.")
+    await member.send("You can't fool me, autogenephile.")
 
 
 async def enforce_trusted_nsfw_role(member: hikari.Member) -> None:
@@ -95,6 +98,7 @@ async def on_member_update(event: hikari.MemberUpdateEvent) -> None:
 
     await remove_minor_adult_role(event.member)
     await enforce_trusted_nsfw_role(event.member)
+    await scold_vika(event.member)
 
 
 async def register_commands() -> None:
