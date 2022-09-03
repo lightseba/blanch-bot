@@ -11,10 +11,12 @@ import hikari
 
 from config import (
     ADULT_ROLE_ID,
+    AGP_ROLE_ID,
     BLANCHPOST_COUNTS_FILE,
     BLANCHPOST_MAX_TYPING_TIME,
     BLANCHPOST_QUOTA,
     BLANCHPOST_WEEK_KEY,
+    HSTS_ROLE_ID,
     INTENTS,
     LOGS_CHANNEL_ID,
     MENTAL_ASYLUM_GUILD_ID,
@@ -22,6 +24,7 @@ from config import (
     TOKEN,
     TRUSTED_NSFW_ROLE_ID,
     TRUSTED_ROLE_ID,
+    VIKA_ID,
 )
 
 bot = hikari.GatewayBot(token=TOKEN, intents=INTENTS)  # type: ignore
@@ -39,6 +42,33 @@ async def remove_minor_adult_role(member: hikari.Member) -> None:
     if ADULT_ROLE_ID in member.role_ids:
         logging.info(f"See child ({member}) w/ adult role, removing...")
         await member.remove_role(ADULT_ROLE_ID)
+
+
+async def scold_vika(member: hikari.Member) -> None:
+    """kek"""
+
+    if member.id != VIKA_ID:
+        return
+
+    assert member.nickname
+
+    is_agp = AGP_ROLE_ID in member.role_ids
+    is_hsts = HSTS_ROLE_ID in member.role_ids
+    is_lesbian = member.nickname.endswith(" (lesbian)")
+
+    if is_agp and not is_hsts and is_lesbian:
+        return
+
+    if not is_agp:
+        await member.add_role(AGP_ROLE_ID)
+    if is_hsts:
+        await member.remove_role(HSTS_ROLE_ID)
+    if not is_lesbian:
+        prefix = member.nickname[: min(len(member.nickname), 32 - len(" (lesbian)"))]
+        new_name = prefix + " (lesbian)"
+        await member.edit(nickname=new_name)
+
+    await member.send("You can't fool me, autogenophile.")
 
 
 async def enforce_trusted_nsfw_role(member: hikari.Member) -> None:
