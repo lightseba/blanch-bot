@@ -17,6 +17,8 @@ from config import (
     MENTAL_ASYLUM_GUILD_ID,
     MINOR_IDS,
     TOKEN,
+    TRUSTED_NSFW_ROLE_ID,
+    TRUSTED_ROLE_ID,
 )
 
 bot = hikari.GatewayBot(token=TOKEN, intents=INTENTS)  # type: ignore
@@ -25,16 +27,41 @@ BLANCHPOSTING_WEEK = -1
 BLANCHPOSTING_COUNTS = {}
 
 
-@bot.listen()
-async def remove_minor_adult_role(event: hikari.MemberUpdateEvent) -> None:
+async def remove_minor_adult_role(member: hikari.Member) -> None:
     """pls eastern stop adding the adult role"""
 
-    if event.member.id not in MINOR_IDS:
+    if member.id not in MINOR_IDS:
         return
 
-    if ADULT_ROLE_ID in event.member.role_ids:
-        logging.info(f"See child ({event.member}) w/ adult role, removing...")
-        await event.member.remove_role(ADULT_ROLE_ID)
+    if ADULT_ROLE_ID in member.role_ids:
+        logging.info(f"See child ({member}) w/ adult role, removing...")
+        await member.remove_role(ADULT_ROLE_ID)
+
+
+async def enforce_trusted_nsfw_role(member: hikari.Member) -> None:
+    """Trusted NSFW = Trusted AND adult"""
+
+    has_adult = ADULT_ROLE_ID in member.role_ids
+    has_trusted = TRUSTED_ROLE_ID in member.role_ids
+    has_trusted_nsfw = TRUSTED_NSFW_ROLE_ID in member.role_ids
+
+    if has_adult and has_trusted and not has_trusted_nsfw:
+        logging.info(f"See trusted adult ({member}) w/o trusted_nsfw role, adding...")
+        await member.add_role(TRUSTED_NSFW_ROLE_ID)
+    elif has_trusted_nsfw and (not has_adult or not has_trusted):
+        logging.info(
+            f"See ({member}) with trusted_nsfw but "
+            f"adult={has_adult} and trusted={has_trusted}, removing..."
+        )
+        await member.remove_role(TRUSTED_NSFW_ROLE_ID)
+
+
+@bot.listen()
+async def on_member_update(event: hikari.MemberUpdateEvent) -> None:
+    """do all the role policing here on update"""
+
+    await remove_minor_adult_role(event.member)
+    await enforce_trusted_nsfw_role(event.member)
 
 
 @bot.listen()
