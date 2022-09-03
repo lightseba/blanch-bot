@@ -123,6 +123,7 @@ async def shutdown_blanchard(event: hikari.StoppedEvent) -> None:
 
     write_post_count_to_file()
 
+
 async def _grab_logs_channel() -> Optional[hikari.GuildChannel]:
     return bot.cache.get_guild_channel(LOGS_CHANNEL_ID) or cast(
         hikari.GuildChannel, await bot.rest.fetch_channel(LOGS_CHANNEL_ID)
