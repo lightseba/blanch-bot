@@ -14,6 +14,7 @@ from config import (
     BLANCHPOST_COUNTS_FILE,
     BLANCHPOST_MAX_TYPING_TIME,
     BLANCHPOST_QUOTA,
+    BLANCHPOST_WEEK_KEY,
     INTENTS,
     LOGS_CHANNEL_ID,
     MENTAL_ASYLUM_GUILD_ID,
@@ -99,14 +100,27 @@ async def register_commands() -> None:
 
 
 def write_post_count_to_file() -> None:
+    global BLANCHPOSTING_COUNTS, BLANCHPOSTING_WEEK
+    BLANCHPOSTING_COUNTS[BLANCHPOST_WEEK_KEY] = BLANCHPOSTING_WEEK
+
+    logging.info(f"Writing counts to file: {BLANCHPOSTING_COUNTS}")
     with open(BLANCHPOST_COUNTS_FILE, "w") as f:
         json.dump(BLANCHPOSTING_COUNTS, f)
 
 
 def read_post_count_from_file() -> None:
-    global BLANCHPOSTING_COUNTS
-    with open(BLANCHPOST_COUNTS_FILE, "r") as f:
-        BLANCHPOSTING_COUNTS = json.load(f)
+    global BLANCHPOSTING_COUNTS, BLANCHPOSTING_WEEK
+
+    try:
+        with open(BLANCHPOST_COUNTS_FILE, "r") as f:
+            BLANCHPOSTING_COUNTS = json.load(f)
+        BLANCHPOSTING_WEEK = BLANCHPOSTING_COUNTS[BLANCHPOST_WEEK_KEY]
+    except FileNotFoundError:
+        # no file, assume reset
+        BLANCHPOSTING_COUNTS = {}
+        BLANCHPOSTING_WEEK = -1
+
+    logging.info(f"Read counts from file: {BLANCHPOSTING_COUNTS}")
 
 
 @bot.listen()
@@ -165,17 +179,6 @@ async def get_reply_message(
     return reply_msg
 
 
-def get_blanchpost_quota(member: hikari.Member) -> int:
-    return max(
-        (
-            quota
-            for role_id, quota in BLANCHPOST_QUOTA.items()
-            if role_id in member.role_ids
-        ),
-        default=0,
-    )
-
-
 def check_blanchpost_week() -> None:
     global BLANCHPOSTING_WEEK, BLANCHPOSTING_COUNTS
 
@@ -186,15 +189,25 @@ def check_blanchpost_week() -> None:
         BLANCHPOSTING_WEEK = current_week
 
 
-def remaining_blanchpost(member: hikari.Member) -> int:
+def get_blanchpost_quota(member: hikari.Member) -> int:
+    """
+    get # of blanchposts this person has this week
+    """
     check_blanchpost_week()
 
     so_far = BLANCHPOSTING_COUNTS.get(member.id, 0)
-    quota = get_blanchpost_quota(member)
+    quota = max(
+        (
+            quota
+            for role_id, quota in BLANCHPOST_QUOTA.items()
+            if role_id in member.role_ids
+        ),
+        default=0,
+    )
     remaining = quota - so_far
 
-    if remaining:
-        BLANCHPOSTING_COUNTS[member.id] = so_far + 1
+    if remaining > 0:
+        BLANCHPOSTING_COUNTS[int(member.id)] = so_far + 1
 
     return remaining
 
@@ -203,8 +216,9 @@ async def handle_blanchpost(interaction: hikari.CommandInteraction) -> None:
     """respond to /blanchpost commands"""
 
     assert interaction.options
+    assert interaction.member
 
-    channel = interaction.get_channel() or await interaction.fetch_channel()
+    channel = await interaction.fetch_channel()
     message_content = interaction.options[0].value
     logging.info(
         f"got blanchpost request from {interaction.member} "
@@ -234,9 +248,22 @@ async def handle_blanchpost(interaction: hikari.CommandInteraction) -> None:
         # no reply, just post it
         reply_msg = None
 
+    remaining_posts = get_blanchpost_quota(interaction.member)
+
+    if remaining_posts == 0:
+        await interaction.create_initial_response(
+            hikari.ResponseType.MESSAGE_CREATE,
+            "Be silent you sputtering peon. "
+            "Don't you dare speak for me. "
+            "(You've run out of blanchposts this week!)",
+            flags=hikari.MessageFlag.EPHEMERAL,
+        )
+        return
+
     await interaction.create_initial_response(
         hikari.ResponseType.MESSAGE_CREATE,
-        "Thank you for the message, my loyal soldier.",
+        "Thank you for the message, my loyal soldier. "
+        f"(You have {remaining_posts-1} blanchposts remaining this week)",
         flags=hikari.MessageFlag.EPHEMERAL,
     )
 
