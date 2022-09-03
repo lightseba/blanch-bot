@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import json
 import random
 from typing import Optional, cast
 
@@ -10,6 +11,7 @@ import hikari
 
 from config import (
     ADULT_ROLE_ID,
+    BLANCHPOST_COUNTS_FILE,
     BLANCHPOST_MAX_TYPING_TIME,
     BLANCHPOST_QUOTA,
     INTENTS,
@@ -64,9 +66,7 @@ async def on_member_update(event: hikari.MemberUpdateEvent) -> None:
     await enforce_trusted_nsfw_role(event.member)
 
 
-@bot.listen()
-async def register_commands(event: hikari.StartingEvent) -> None:
-    """Register blanchposting command"""
+async def register_commands() -> None:
     application = await bot.rest.fetch_application()
 
     commands = [
@@ -97,6 +97,31 @@ async def register_commands(event: hikari.StartingEvent) -> None:
         guild=MENTAL_ASYLUM_GUILD_ID,
     )
 
+
+def write_post_count_to_file() -> None:
+    with open(BLANCHPOST_COUNTS_FILE, "w") as f:
+        json.dump(BLANCHPOSTING_COUNTS, f)
+
+
+def read_post_count_from_file() -> None:
+    global BLANCHPOSTING_COUNTS
+    with open(BLANCHPOST_COUNTS_FILE, "r") as f:
+        BLANCHPOSTING_COUNTS = json.load(f)
+
+
+@bot.listen()
+async def startup_blanchard(event: hikari.StartingEvent) -> None:
+    """Register blanchposting command"""
+
+    read_post_count_from_file()
+    await register_commands()
+
+
+@bot.listen()
+async def shutdown_blanchard(event: hikari.StoppedEvent) -> None:
+    """shutting down (sad beep)"""
+
+    write_post_count_to_file()
 
 async def _grab_logs_channel() -> Optional[hikari.GuildChannel]:
     return bot.cache.get_guild_channel(LOGS_CHANNEL_ID) or cast(
