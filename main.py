@@ -25,12 +25,15 @@ from config import (
     TRUSTED_NSFW_ROLE_ID,
     TRUSTED_ROLE_ID,
     VIKA_ID,
+    VIKA_SUFFIX_DEFAULT,
+    VIKA_SUFFIX_KEY,
 )
 
 bot = hikari.GatewayBot(token=TOKEN, intents=INTENTS)  # type: ignore
 
 BLANCHPOSTING_WEEK = -1
 BLANCHPOSTING_COUNTS = {}
+vika_suffix = VIKA_SUFFIX_DEFAULT
 
 
 async def remove_minor_adult_role(member: hikari.Member) -> None:
@@ -44,7 +47,11 @@ async def remove_minor_adult_role(member: hikari.Member) -> None:
         await member.remove_role(ADULT_ROLE_ID)
 
 
-async def scold_vika(member: hikari.Member) -> None:
+async def scold_vika(
+    member: hikari.Member,
+    silent: bool = True,
+    old_suffix: Optional[str] = None,
+) -> None:
     """kek"""
 
     logging.info(f"update from {member}")
@@ -52,26 +59,35 @@ async def scold_vika(member: hikari.Member) -> None:
     if member.id != VIKA_ID:
         return
 
-    logging.info("see vika!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    assert member.nickname
+    logging.info("see vika!!!!")
 
     is_agp = AGP_ROLE_ID in member.role_ids
     is_hsts = HSTS_ROLE_ID in member.role_ids
-    is_lesbian = member.nickname.endswith(" (lesbian)")
+    is_lesbian = member.display_name.endswith(vika_suffix)
 
     if is_agp and not is_hsts and is_lesbian:
         return
 
-    if not is_agp:
-        await member.add_role(AGP_ROLE_ID)
-    if is_hsts:
-        await member.remove_role(HSTS_ROLE_ID)
-    if not is_lesbian:
-        prefix = member.nickname[: min(len(member.nickname), 32 - len(" (lesbian)"))]
-        new_name = prefix + " (lesbian)"
-        await member.edit(nickname=new_name)
+    current_name = (
+        member.display_name[: -len(old_suffix)]
+        if old_suffix and member.display_name.endswith(old_suffix)
+        else member.display_name
+    )
+    new_roles = hikari.UNDEFINED
+    new_name = hikari.UNDEFINED
 
-    await member.send("You can't fool me, autogenephile.")
+    if not is_agp or is_hsts:
+        new_roles = [role for role in member.role_ids if role != HSTS_ROLE_ID] + [
+            AGP_ROLE_ID
+        ]
+
+    if not is_lesbian:
+        prefix = current_name[: min(len(current_name), 32 - len(vika_suffix))]
+        new_name = prefix + vika_suffix
+
+    await member.edit(nickname=new_name, roles=new_roles)
+    if not silent and (not is_agp or is_hsts):
+        await member.send("You can't fool me, autogenephile.")
 
 
 async def enforce_trusted_nsfw_role(member: hikari.Member) -> None:
@@ -123,7 +139,19 @@ async def register_commands() -> None:
                 description="Message to reply to. Either a message ID or link.",
                 is_required=False,
             )
+        ),
+        bot.rest.slash_command_builder("bullyvika", "Change the suffix on Vika.")
+        .add_option(
+            hikari.CommandOption(
+                type=hikari.OptionType.STRING,
+                name="suffix",
+                description="the new suffix (at most 31 characters)",
+                is_required=True,
+            )
         )
+        .set_default_member_permissions(
+            0
+        ),  # perms 0 so it must be manually enabled on ppl
     ]
 
     await bot.rest.set_application_commands(
@@ -134,8 +162,9 @@ async def register_commands() -> None:
 
 
 def write_post_count_to_file() -> None:
-    global BLANCHPOSTING_COUNTS, BLANCHPOSTING_WEEK
+    global BLANCHPOSTING_COUNTS, BLANCHPOSTING_WEEK, vika_suffix
     BLANCHPOSTING_COUNTS[BLANCHPOST_WEEK_KEY] = BLANCHPOSTING_WEEK
+    BLANCHPOSTING_COUNTS[VIKA_SUFFIX_KEY] = vika_suffix
 
     logging.info(f"Writing counts to file: {BLANCHPOSTING_COUNTS}")
     with open(BLANCHPOST_COUNTS_FILE, "w") as f:
@@ -143,16 +172,18 @@ def write_post_count_to_file() -> None:
 
 
 def read_post_count_from_file() -> None:
-    global BLANCHPOSTING_COUNTS, BLANCHPOSTING_WEEK
+    global BLANCHPOSTING_COUNTS, BLANCHPOSTING_WEEK, vika_suffix
 
     try:
         with open(BLANCHPOST_COUNTS_FILE, "r") as f:
             BLANCHPOSTING_COUNTS = json.load(f)
         BLANCHPOSTING_WEEK = BLANCHPOSTING_COUNTS[BLANCHPOST_WEEK_KEY]
+        vika_suffix = BLANCHPOSTING_COUNTS[VIKA_SUFFIX_KEY]
     except FileNotFoundError:
         # no file, assume reset
         BLANCHPOSTING_COUNTS = {}
         BLANCHPOSTING_WEEK = -1
+        vika_suffix = VIKA_SUFFIX_DEFAULT
 
     logging.info(f"Read counts from file: {BLANCHPOSTING_COUNTS}")
 
@@ -329,6 +360,39 @@ async def handle_blanchpost(interaction: hikari.CommandInteraction) -> None:
         logging.error(e)
 
 
+async def handle_bullyvika(interaction: hikari.CommandInteraction) -> None:
+    """respond to /blanchpost commands"""
+    global vika_suffix
+
+    assert interaction.options
+    assert interaction.member
+
+    new_suffix = cast(str, interaction.options[0].value)
+
+    logging.info(f"Got vika suffix request from {interaction.member}, '{new_suffix}'")
+
+    if len(new_suffix) > 31:
+        logging.error("suffix is too long!!")
+        await interaction.create_initial_response(
+            hikari.ResponseType.MESSAGE_CREATE,
+            "That suffix is too long! It can be at most 31 characters.",
+            flags=hikari.MessageFlag.EPHEMERAL,
+        )
+        return
+
+    await interaction.create_initial_response(
+        hikari.ResponseType.MESSAGE_CREATE,
+        f"Thank you {interaction.member.display_name}. Allow me to apply it...",
+        flags=hikari.MessageFlag.EPHEMERAL,
+    )
+
+    old_suffix = vika_suffix
+    vika_suffix = " " + new_suffix
+
+    vika = await bot.rest.fetch_member(MENTAL_ASYLUM_GUILD_ID, VIKA_ID)
+    await scold_vika(vika, silent=True, old_suffix=old_suffix)
+
+
 @bot.listen()
 async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
     """Listen for slash and message commands being executed."""
@@ -338,6 +402,8 @@ async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
 
         if event.interaction.command_name == "blanchpost":
             await handle_blanchpost(event.interaction)
+        elif event.interaction.command_name == "bullyvika":
+            await handle_bullyvika(event.interaction)
 
 
 bot.run()
