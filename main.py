@@ -5,6 +5,7 @@ import datetime
 import logging
 import json
 import random
+import re
 from typing import Optional, cast
 
 import hikari
@@ -16,11 +17,13 @@ from config import (
     BLANCHPOST_MAX_TYPING_TIME,
     BLANCHPOST_QUOTA,
     BLANCHPOST_WEEK_KEY,
+    CORN_ROLE_ID,
     HSTS_ROLE_ID,
     INTENTS,
     LOGS_CHANNEL_ID,
     MENTAL_ASYLUM_GUILD_ID,
     MINOR_IDS,
+    SUS_WORDS,
     TOKEN,
     TRUSTED_NSFW_ROLE_ID,
     TRUSTED_ROLE_ID,
@@ -34,6 +37,51 @@ bot = hikari.GatewayBot(token=TOKEN, intents=INTENTS)  # type: ignore
 BLANCHPOSTING_WEEK = -1
 BLANCHPOSTING_COUNTS = {}
 vika_suffix = VIKA_SUFFIX_DEFAULT
+
+
+def to_regex_subsequence(s: str) -> str:
+    middle = "".join(rf"([{c.lower()}{c.upper()}])(.*?)" for c in s)
+    return rf"^(.*?){middle}$"
+
+
+corn_pattern = to_regex_subsequence("YouJustGotCorned")
+corned = re.compile(corn_pattern, flags=re.MULTILINE)
+
+
+def corn_subsequence(s: str) -> Optional[str]:
+    m = corned.match(s)
+
+    if m := corned.match(s):
+        return "".join(
+            f"||{sub}||" if i % 2 == 0 and len(sub) else sub
+            for i, sub in enumerate(m.groups())
+        )
+    else:
+        return None
+
+
+@bot.listen()
+async def listen_message(event: hikari.GuildMessageCreateEvent):
+    """on each message"""
+
+    msg = (event.message.content or "").lower()
+
+    if "corn" in msg:
+        await event.message.add_reaction("🌽")
+
+    if event.message.member:
+        if (
+            # "corn" not in msg
+            CORN_ROLE_ID in event.message.member.role_ids
+        ):
+            if rep := corn_subsequence(event.message.content or ""):
+                if random.random() < 0.05:
+                    await event.message.respond(rep, reply=True)
+
+    for word in SUS_WORDS:
+        if word in msg:
+            await event.message.add_reaction("👀")
+            return
 
 
 async def remove_minor_adult_role(member: hikari.Member) -> None:
@@ -50,6 +98,7 @@ async def remove_minor_adult_role(member: hikari.Member) -> None:
 async def scold_vika(
     member: hikari.Member,
     silent: bool = True,
+    name: Optional[str] = None,
     old_suffix: Optional[str] = None,
 ) -> None:
     """kek"""
@@ -63,12 +112,12 @@ async def scold_vika(
 
     is_agp = AGP_ROLE_ID in member.role_ids
     is_hsts = HSTS_ROLE_ID in member.role_ids
-    is_lesbian = member.display_name.endswith(vika_suffix)
+    is_lesbian = name is None and member.display_name.endswith(vika_suffix)
 
     if is_agp and not is_hsts and is_lesbian:
         return
 
-    current_name = (
+    current_name = name or (
         member.display_name[: -len(old_suffix)]
         if old_suffix and member.display_name.endswith(old_suffix)
         else member.display_name
@@ -76,18 +125,21 @@ async def scold_vika(
     new_roles = hikari.UNDEFINED
     new_name = hikari.UNDEFINED
 
-    if not is_agp or is_hsts:
-        new_roles = [role for role in member.role_ids if role != HSTS_ROLE_ID] + [
-            AGP_ROLE_ID
-        ]
+    # if not is_agp or is_hsts:
+    #     new_roles = [role for role in member.role_ids if role != HSTS_ROLE_ID] + [
+    #         AGP_ROLE_ID
+    #     ]
 
     if not is_lesbian:
         prefix = current_name[: min(len(current_name), 32 - len(vika_suffix))]
         new_name = prefix + vika_suffix
+        logging.info(
+            f"see '{member.display_name}' not ending with '{vika_suffix}' -> '{new_name}'"
+        )
 
     await member.edit(nickname=new_name, roles=new_roles)
-    if not silent and (not is_agp or is_hsts):
-        await member.send("You can't fool me, autogenephile.")
+    # if not silent and (not is_agp or is_hsts):
+    #     await member.send("You can't fool me, autogenephile.")
 
 
 async def enforce_trusted_nsfw_role(member: hikari.Member) -> None:
@@ -114,7 +166,7 @@ async def on_member_update(event: hikari.MemberUpdateEvent) -> None:
 
     await remove_minor_adult_role(event.member)
     await enforce_trusted_nsfw_role(event.member)
-    await scold_vika(event.member)
+    # await scold_vika(event.member)
 
 
 async def register_commands() -> None:
@@ -147,6 +199,14 @@ async def register_commands() -> None:
                 name="suffix",
                 description="the new suffix (at most 31 characters)",
                 is_required=True,
+            )
+        )
+        .add_option(
+            hikari.CommandOption(
+                type=hikari.OptionType.STRING,
+                name="prefix",
+                description="new name prefix",
+                is_required=False,
             )
         )
         .set_default_member_permissions(
@@ -368,6 +428,11 @@ async def handle_bullyvika(interaction: hikari.CommandInteraction) -> None:
     assert interaction.member
 
     new_suffix = cast(str, interaction.options[0].value)
+    new_prefix = (
+        cast(str, interaction.options[1].value)
+        if len(interaction.options) >= 2
+        else None
+    )
 
     logging.info(f"Got vika suffix request from {interaction.member}, '{new_suffix}'")
 
@@ -390,7 +455,7 @@ async def handle_bullyvika(interaction: hikari.CommandInteraction) -> None:
     vika_suffix = " " + new_suffix
 
     vika = await bot.rest.fetch_member(MENTAL_ASYLUM_GUILD_ID, VIKA_ID)
-    await scold_vika(vika, silent=True, old_suffix=old_suffix)
+    await scold_vika(vika, silent=True, name=new_prefix, old_suffix=old_suffix)
 
 
 @bot.listen()

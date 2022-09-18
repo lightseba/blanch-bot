@@ -1,5 +1,5 @@
 import os
-from typing import Final, Mapping, Tuple
+from typing import Final, Mapping, Sequence, Tuple
 
 import hikari
 from dotenv import load_dotenv
@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TOKEN: Final[str] = os.getenv("TOKEN") or ""
-INTENTS: Final[hikari.Intents] = hikari.Intents.GUILD_MEMBERS
+INTENTS: Final[hikari.Intents] = hikari.Intents.GUILD_MEMBERS | hikari.Intents.GUILD_MESSAGES
 
 MENTAL_ASYLUM_GUILD_ID: Final[int] = 1005926922062139463
 LOGS_CHANNEL_ID: Final[int] = 1007811381694824469
@@ -20,9 +20,12 @@ TRUSTED_ROLE_ID: Final[int] = 1009589091777646643
 TRUSTED_NSFW_ROLE_ID: Final[int] = 1015352468147806359
 AGP_ROLE_ID: Final[int] = 1006014075538513973
 HSTS_ROLE_ID: Final[int] = 1006014165929959505
+CORN_ROLE_ID: Final[int] = 1017197709775609946
 
-VIKA_SUFFIX_DEFAULT = ""
-VIKA_SUFFIX_KEY = "VIKA_SUFFIX"
+VIKA_SUFFIX_DEFAULT: Final[str] = ""
+VIKA_SUFFIX_KEY: Final[str] = "VIKA_SUFFIX"
+
+SUS_WORDS: Final[Sequence[str]] = ("agp", "hsts", "aap")
 
 BLANCHPOST_COUNTS_FILE: Final[str] = "blanchposting_counts.json"
 BLANCHPOST_WEEK_KEY = "BLANCHPOST_WEEK"
