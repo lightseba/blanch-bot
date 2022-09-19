@@ -73,7 +73,8 @@ async def listen_message(event: hikari.GuildMessageCreateEvent):
     if event.message.member:
         if (
             # "corn" not in msg
-            CORN_ROLE_ID in event.message.member.role_ids
+            CORN_ROLE_ID
+            in event.message.member.role_ids
         ):
             if rep := corn_subsequence(event.message.content or ""):
                 if random.random() < 0.05:
@@ -193,6 +194,7 @@ async def register_commands() -> None:
                 is_required=False,
             )
         ),
+
         bot.rest.slash_command_builder("bullyvika", "Change the suffix on Vika.")
         .add_option(
             hikari.CommandOption(
@@ -209,14 +211,11 @@ async def register_commands() -> None:
                 description="new name prefix",
                 is_required=False,
             )
-        )
-        .set_default_member_permissions(
-            0
-        ),  # perms 0 so it must be manually enabled on ppl
-        bot.rest.context_menu_command_builder(
-            hikari.CommandType.MESSAGE, "Report"
-        )
-        .set_is_dm_enabled(False),
+        ),
+        
+        bot.rest.context_menu_command_builder(hikari.CommandType.MESSAGE, "Report")
+        .set_is_dm_enabled(False)
+        .set_default_member_permissions(0),
     ]
 
     await bot.rest.set_application_commands(
@@ -478,17 +477,22 @@ async def handle_report(interaction: hikari.CommandInteraction) -> None:
     channel = await interaction.fetch_channel()
     message = await channel.fetch_message(interaction.target_id)
     reports_channel = await bot.rest.fetch_channel(REPORTS_CHANNEL_ID)
+    assert isinstance(reports_channel, hikari.GuildTextChannel)
+
+    report_msg = (
+        f"{interaction.member.mention} has reported a message from {message.author.mention}. Content:\n"
+        f"{message.content}\n"
+        f"{message.make_link(MENTAL_ASYLUM_GUILD_ID)}\n"
+        "<@&1005930819094851655> <@&1011408948089335829> <@&1011409350444716133>\n"
+    )
 
     await reports_channel.send(
-        content=(
-            f"{interaction.member.mention} has reported a message from {message.author.mention}:\n"
-            f"{message.make_link(MENTAL_ASYLUM_GUILD_ID)}"
-            # "<@&1005930819094851655> <@&1011408948089335829> <@&1011409350444716133>"
-        ),
-        # mentions_everyone=True,
-        # user_mentions=True,
-        # role_mentions=True,
+        content=report_msg,
+        role_mentions=True,
+        attachments=message.attachments,
+        embeds=message.embeds,
     )
+
 
 @bot.listen()
 async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
