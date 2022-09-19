@@ -23,6 +23,7 @@ from config import (
     LOGS_CHANNEL_ID,
     MENTAL_ASYLUM_GUILD_ID,
     MINOR_IDS,
+    REPORTS_CHANNEL_ID,
     SUS_WORDS,
     TOKEN,
     TRUSTED_NSFW_ROLE_ID,
@@ -476,13 +477,17 @@ async def handle_report(interaction: hikari.CommandInteraction) -> None:
 
     channel = await interaction.fetch_channel()
     message = await channel.fetch_message(interaction.target_id)
-    logs_channel = await bot.rest.fetch_channel(LOGS_CHANNEL_ID)
+    reports_channel = await bot.rest.fetch_channel(REPORTS_CHANNEL_ID)
 
-    await logs_channel.send(
-        content=f"{interaction.member.mention} has reported a message:\n"+f"{message.make_link(MENTAL_ASYLUM_GUILD_ID)}\n"+"<@&1005930819094851655> <@&1011408948089335829> <@&1011409350444716133>",
-        mentions_everyone=True,
-        user_mentions=True,
-        role_mentions=True,
+    await reports_channel.send(
+        content=(
+            f"{interaction.member.mention} has reported a message from {message.author.mention}:\n"
+            f"{message.make_link(MENTAL_ASYLUM_GUILD_ID)}"
+            # "<@&1005930819094851655> <@&1011408948089335829> <@&1011409350444716133>"
+        ),
+        # mentions_everyone=True,
+        # user_mentions=True,
+        # role_mentions=True,
     )
 
 @bot.listen()

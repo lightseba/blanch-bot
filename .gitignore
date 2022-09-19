@@ -2,3 +2,5 @@
 .vscode
 __pycache__
 blanchposting_counts.json
+__pycache__
+Pipfile
