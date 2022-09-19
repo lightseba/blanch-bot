@@ -212,6 +212,10 @@ async def register_commands() -> None:
         .set_default_member_permissions(
             0
         ),  # perms 0 so it must be manually enabled on ppl
+        bot.rest.context_menu_command_builder(
+            hikari.CommandType.MESSAGE, "Report"
+        )
+        .set_is_dm_enabled(False),
     ]
 
     await bot.rest.set_application_commands(
@@ -458,6 +462,29 @@ async def handle_bullyvika(interaction: hikari.CommandInteraction) -> None:
     await scold_vika(vika, silent=True, name=new_prefix, old_suffix=old_suffix)
 
 
+async def handle_report(interaction: hikari.CommandInteraction) -> None:
+    """respond to /blanchpost commands"""
+    global vika_suffix
+
+    assert interaction.member
+
+    await interaction.create_initial_response(
+        hikari.ResponseType.MESSAGE_CREATE,
+        f"Thank you {interaction.member.display_name}. This message has been reported to the moderators.",
+        flags=hikari.MessageFlag.EPHEMERAL,
+    )
+
+    channel = await interaction.fetch_channel()
+    message = await channel.fetch_message(interaction.target_id)
+    logs_channel = await bot.rest.fetch_channel(LOGS_CHANNEL_ID)
+
+    await logs_channel.send(
+        content=f"{interaction.member.mention} has reported a message:\n"+f"{message.make_link(MENTAL_ASYLUM_GUILD_ID)}\n"+"<@&1005930819094851655> <@&1011408948089335829> <@&1011409350444716133>",
+        mentions_everyone=True,
+        user_mentions=True,
+        role_mentions=True,
+    )
+
 @bot.listen()
 async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
     """Listen for slash and message commands being executed."""
@@ -469,6 +496,8 @@ async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
             await handle_blanchpost(event.interaction)
         elif event.interaction.command_name == "bullyvika":
             await handle_bullyvika(event.interaction)
+        elif event.interaction.command_name == "Report":
+            await handle_report(event.interaction)
 
 
 bot.run()
