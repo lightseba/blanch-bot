@@ -1,5 +1,5 @@
 import os
-from typing import Final, Mapping, Sequence, Tuple
+from typing import Final, Mapping, Sequence
 
 import hikari
 from dotenv import load_dotenv
@@ -7,13 +7,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TOKEN: Final[str] = os.getenv("TOKEN") or ""
-INTENTS: Final[hikari.Intents] = hikari.Intents.GUILD_MEMBERS | hikari.Intents.GUILD_MESSAGES
+INTENTS: Final[hikari.Intents] = (
+    hikari.Intents.GUILD_MEMBERS | hikari.Intents.GUILD_MESSAGES
+)
 
 MENTAL_ASYLUM_GUILD_ID: Final[int] = 1005926922062139463
 LOGS_CHANNEL_ID: Final[int] = 1007811381694824469
 REPORTS_CHANNEL_ID: Final[int] = 1007811353404264548
 
-MINOR_IDS: Final[Tuple[int]] = (963674009986281534,)  # eastern
+MINOR_IDS: Final[Sequence[int]] = (
+    963674009986281534,  # eastern
+    # 394329175680352258,  # clem
+)
 VIKA_ID: Final[int] = 398125196567117824
 
 ADULT_ROLE_ID: Final[int] = 1007477954693058660
@@ -27,6 +32,7 @@ VIKA_SUFFIX_DEFAULT: Final[str] = ""
 VIKA_SUFFIX_KEY: Final[str] = "VIKA_SUFFIX"
 
 SUS_WORDS: Final[Sequence[str]] = ("agp", "hsts", "aap")
+BANNED_LINK: Final[str] = "anthro.cs.uni-freiburg.de"
 
 BLANCHPOST_COUNTS_FILE: Final[str] = "blanchposting_counts.json"
 BLANCHPOST_WEEK_KEY = "BLANCHPOST_WEEK"

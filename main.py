@@ -13,6 +13,7 @@ import hikari
 from config import (
     ADULT_ROLE_ID,
     AGP_ROLE_ID,
+    BANNED_LINK,
     BLANCHPOST_COUNTS_FILE,
     BLANCHPOST_MAX_TYPING_TIME,
     BLANCHPOST_QUOTA,
@@ -63,27 +64,35 @@ def corn_subsequence(s: str) -> Optional[str]:
 
 @bot.listen()
 async def listen_message(event: hikari.GuildMessageCreateEvent):
-    """on each message"""
+    """on each message creation"""
 
     msg = (event.message.content or "").lower()
 
     if "corn" in msg:
         await event.message.add_reaction("🌽")
 
-    if event.message.member:
-        if (
-            # "corn" not in msg
-            CORN_ROLE_ID
-            in event.message.member.role_ids
-        ):
-            if rep := corn_subsequence(event.message.content or ""):
-                if random.random() < 0.05:
-                    await event.message.respond(rep, reply=True)
+    if BANNED_LINK in msg:
+        await event.message.delete()
+        return
+
+    if event.message.member and CORN_ROLE_ID in event.message.member.role_ids:
+        if rep := corn_subsequence(event.message.content or ""):
+            await event.message.respond(rep, reply=True)
 
     for word in SUS_WORDS:
         if word in msg:
             await event.message.add_reaction("👀")
             return
+
+
+async def listen_message_update(event: hikari.GuildMessageUpdateEvent):
+    """on each message update"""
+
+    msg = (event.message.content or "").lower()
+
+    if BANNED_LINK in msg:
+        await event.message.delete()
+        return
 
 
 async def remove_minor_adult_role(member: hikari.Member) -> None:
@@ -194,7 +203,6 @@ async def register_commands() -> None:
                 is_required=False,
             )
         ),
-
         bot.rest.slash_command_builder("bullyvika", "Change the suffix on Vika.")
         .add_option(
             hikari.CommandOption(
@@ -212,7 +220,6 @@ async def register_commands() -> None:
                 is_required=False,
             )
         ),
-        
         bot.rest.context_menu_command_builder(hikari.CommandType.MESSAGE, "Report")
         .set_is_dm_enabled(False)
         .set_default_member_permissions(0),
@@ -474,6 +481,7 @@ async def handle_report(interaction: hikari.CommandInteraction) -> None:
         flags=hikari.MessageFlag.EPHEMERAL,
     )
 
+    assert interaction.target_id
     channel = await interaction.fetch_channel()
     message = await channel.fetch_message(interaction.target_id)
     reports_channel = await bot.rest.fetch_channel(REPORTS_CHANNEL_ID)
