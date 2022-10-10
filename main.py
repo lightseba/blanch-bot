@@ -366,15 +366,15 @@ async def handle_blanchpost(interaction: hikari.CommandInteraction) -> None:
     assert interaction.options
     assert interaction.member
 
-    if interaction.member.id == SEBA_ID:
-        await close_and_reboot()
-
     channel = await interaction.fetch_channel()
     message_content = interaction.options[0].value
     logging.info(
         f"got blanchpost request from {interaction.member} "
         f"in {channel} with content '{message_content}'"
     )
+
+    if interaction.member.id == SEBA_ID and message_content == "reboot":
+        await close_and_reboot()
 
     if len(interaction.options) >= 2:
         # replying to a specific message
