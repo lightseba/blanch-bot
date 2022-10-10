@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import logging
 import json
+import logging
+import os
 import random
 import re
+import subprocess
+import sys
 from typing import Optional, cast
 
 import hikari
@@ -25,6 +28,7 @@ from config import (
     MENTAL_ASYLUM_GUILD_ID,
     MINOR_IDS,
     REPORTS_CHANNEL_ID,
+    SEBA_ID,
     SUS_WORDS,
     TOKEN,
     TRUSTED_NSFW_ROLE_ID,
@@ -41,13 +45,21 @@ BLANCHPOSTING_COUNTS = {}
 vika_suffix = VIKA_SUFFIX_DEFAULT
 
 
-def to_regex_subsequence(s: str) -> str:
+def _to_regex_subsequence(s: str) -> str:
     middle = "".join(rf"([{c.lower()}{c.upper()}])(.*?)" for c in s)
     return rf"^(.*?){middle}$"
 
 
-corn_pattern = to_regex_subsequence("YouJustGotCorned")
+corn_pattern = _to_regex_subsequence("YouJustGotCorned")
 corned = re.compile(corn_pattern, flags=re.MULTILINE)
+
+REBOOT: bool = False
+
+
+async def close_and_reboot():
+    global REBOOT
+    REBOOT = True
+    await bot.close()
 
 
 def corn_subsequence(s: str) -> Optional[str]:
@@ -354,6 +366,9 @@ async def handle_blanchpost(interaction: hikari.CommandInteraction) -> None:
     assert interaction.options
     assert interaction.member
 
+    if interaction.member.id == SEBA_ID:
+        await close_and_reboot()
+
     channel = await interaction.fetch_channel()
     message_content = interaction.options[0].value
     logging.info(
@@ -518,3 +533,19 @@ async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
 
 
 bot.run()
+
+if REBOOT:
+    # update the git repo
+    subprocess.run(["git", "pull"], timeout=60, check=True)
+
+    # make sure pipenv packages are up to date post pull
+    subprocess.run(["pipenv", "sync"], timeout=300, check=True)
+
+    # grab the pipenv interperter location
+    # can't use sys.executable because path changes if pipenv changes
+    python_path = subprocess.run(
+        ["pipenv", "--py"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    # replace this process with the new one
+    os.execv(python_path, [python_path] + sys.argv)
